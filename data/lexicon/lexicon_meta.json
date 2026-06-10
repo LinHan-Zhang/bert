@@ -1,0 +1,18 @@
+{
+  "source": "大连理工大学情感词汇本体 (DLUT) + train corpus mining",
+  "source_url": "https://github.com/yizhanmiao/DLUT-Emotionontology",
+  "citation": "徐琳宏, 林鸿飞, 潘宇, 等. 情感词汇本体的构造[J]. 情报学报, 2008, 27(2): 180-185.",
+  "positive_words": 712,
+  "negative_words": 750,
+  "dlut_selected_positive": 500,
+  "dlut_selected_negative": 500,
+  "mined_positive": 250,
+  "mined_negative": 250,
+  "top_k_per_polarity": 500,
+  "min_hits": 3,
+  "mine_top_k": 250,
+  "mine_min_hits": 5,
+  "mine_min_log_odds": 0.35,
+  "train_corpus_filtered": true,
+  "train_mining_enabled": true
+}

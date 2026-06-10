@@ -1,0 +1,26 @@
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# 环境与工具
+.autodl/
+.gradio/
+.env
+
+# 训练产物（体积大，不提交）
+models/
+outputs/
+logs/
+*.log
+
+# 预训练权重与实验结果
+bert/model/
+bert/results/
+bert/data/
+
+# 大文件
+*.pt
+*.bin
+*.safetensors
+*.parquet

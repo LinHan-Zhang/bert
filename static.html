@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SLK-RoBERTa Dashboard</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 520px; margin: 4rem auto; padding: 2rem; color: #1e3a5f; }
+    code { background: #eff6ff; padding: .2rem .4rem; border-radius: 4px; }
+    a { color: #2563eb; }
+  </style>
+</head>
+<body>
+  <h1>页面已合并</h1>
+  <p>静态展示页已并入统一 Dashboard，请在本机运行：</p>
+  <pre><code>cd /root/autodl-tmp
+python dashboard_app.py</code></pre>
+  <p>然后在 AutoDL 映射 <strong>8080</strong> 端口，打开控制台提供的链接。</p>
+  <p id="auto"></p>
+  <script>
+    if (location.protocol.startsWith("http") && location.port !== "8080") {
+      document.getElementById("auto").innerHTML = '<a href="/">若已通过 dashboard 服务访问，点击此处进入</a>';
+      if (location.pathname !== "/static.html") location.href = "/";
+    }
+  </script>
+</body>
+</html>

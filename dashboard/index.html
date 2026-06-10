@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SLK-RoBERTa · 情感分析智能平台</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+  <style>
+    :root {
+      --blue-900: #0c1929;
+      --blue-800: #0f2744;
+      --blue-700: #1e3a5f;
+      --blue-600: #2563eb;
+      --blue-500: #3b82f6;
+      --blue-400: #60a5fa;
+      --blue-100: #dbeafe;
+      --blue-50: #eff6ff;
+      --bg: #f0f4f8;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --pos: #059669;
+      --neg: #dc2626;
+      --shadow: 0 4px 24px rgba(15, 39, 68, 0.08);
+      --sidebar-w: 220px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Inter", "Segoe UI", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .app { display: flex; min-height: 100vh; }
+    .sidebar {
+      width: var(--sidebar-w);
+      background: linear-gradient(180deg, var(--blue-900) 0%, var(--blue-800) 100%);
+      color: #e2e8f0;
+      padding: 1.5rem 1rem;
+      position: fixed;
+      height: 100vh;
+      overflow-y: auto;
+      z-index: 100;
+    }
+    .brand { font-size: 1rem; font-weight: 700; color: #fff; margin-bottom: .25rem; }
+    .brand-sub { font-size: .7rem; color: var(--blue-400); margin-bottom: 1.5rem; line-height: 1.4; }
+    .nav a {
+      display: block; padding: .55rem .75rem; border-radius: 8px;
+      color: #cbd5e1; text-decoration: none; font-size: .82rem; margin-bottom: .25rem;
+      transition: .15s;
+    }
+    .nav a:hover, .nav a.active {
+      background: rgba(59,130,246,.25); color: #fff;
+    }
+    .nav a.active { background: rgba(59,130,246,.4); font-weight: 600; }
+    .access-tip {
+      margin-top: 1.5rem; padding: .75rem; border-radius: 10px;
+      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+      font-size: .68rem; line-height: 1.55; color: #94a3b8;
+    }
+    .access-tip strong { color: #dbeafe; display: block; margin-bottom: .35rem; font-size: .72rem; }
+    .access-tip code { color: #93c5fd; font-size: .65rem; word-break: break-all; }
+    .main { margin-left: var(--sidebar-w); flex: 1; padding: 1.5rem 2rem; max-width: calc(100vw - var(--sidebar-w)); }
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;
+    }
+    .topbar h1 { font-size: 1.5rem; font-weight: 700; color: var(--blue-800); }
+    .topbar p { color: var(--muted); font-size: .85rem; margin-top: .2rem; }
+    .badge-row { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .badge {
+      background: var(--blue-50); border: 1px solid var(--blue-100);
+      color: var(--blue-700); padding: .3rem .75rem; border-radius: 999px; font-size: .75rem;
+    }
+    .badge.live { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
+    .grid { display: grid; gap: 1rem; }
+    .kpi-grid { grid-template-columns: repeat(6, 1fr); }
+    .cols-2 { grid-template-columns: 1fr 1fr; }
+    .cols-3 { grid-template-columns: repeat(3, 1fr); }
+    .cols-4 { grid-template-columns: repeat(4, 1fr); }
+    @media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .main { margin-left: 0; max-width: 100vw; padding: 1rem; }
+      .kpi-grid, .cols-2, .cols-3, .cols-4 { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 1.2rem; box-shadow: var(--shadow);
+    }
+    .card h2 {
+      font-size: .95rem; font-weight: 600; margin-bottom: 1rem;
+      color: var(--blue-800); display: flex; align-items: center; gap: .5rem;
+    }
+    .card h2::before {
+      content: ""; width: 4px; height: 16px; background: var(--blue-500); border-radius: 2px;
+    }
+    .kpi-value { font-size: 1.65rem; font-weight: 700; color: var(--blue-600); line-height: 1.2; }
+    .kpi-label { font-size: .68rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-top: .3rem; }
+    .kpi-delta { font-size: .72rem; color: var(--pos); margin-top: .25rem; }
+    .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .6rem; }
+    .info-item {
+      background: var(--blue-50); border-radius: 10px; padding: .65rem .8rem; font-size: .78rem;
+    }
+    .info-item span { display: block; color: var(--muted); font-size: .68rem; margin-bottom: .15rem; }
+    textarea {
+      width: 100%; min-height: 100px; border: 1px solid var(--border); border-radius: 10px;
+      padding: .85rem; font-size: .92rem; font-family: inherit; outline: none; resize: vertical;
+    }
+    textarea:focus { border-color: var(--blue-400); box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+    .btn-row { display: flex; gap: .5rem; margin-top: .7rem; flex-wrap: wrap; }
+    button {
+      border: none; border-radius: 8px; padding: .5rem 1rem; font-size: .82rem;
+      cursor: pointer; font-weight: 500; transition: .15s;
+    }
+    .btn-primary { background: var(--blue-600); color: #fff; }
+    .btn-primary:hover { background: var(--blue-700); }
+    .btn-ghost { background: #fff; color: var(--blue-700); border: 1px solid var(--border); }
+    .result-box {
+      margin-top: .9rem; padding: 1rem; border-radius: 10px;
+      background: linear-gradient(135deg, var(--blue-50), #fff);
+      border: 1px solid var(--blue-100); min-height: 130px;
+    }
+    .result-label {
+      display: inline-block; padding: .2rem .65rem; border-radius: 999px;
+      font-weight: 600; font-size: .85rem; margin-bottom: .4rem;
+    }
+    .result-label.pos { background: #d1fae5; color: var(--pos); }
+    .result-label.neg { background: #fee2e2; color: var(--neg); }
+    .prob-row { display: flex; align-items: center; gap: .5rem; margin: .3rem 0; font-size: .78rem; }
+    .prob-row span:first-child { width: 1.5rem; color: var(--muted); }
+    .bar-track { flex: 1; height: 7px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 4px; transition: width .4s; }
+    .bar-fill.pos { background: var(--pos); }
+    .bar-fill.neg { background: var(--neg); }
+    .analysis { font-size: .8rem; color: var(--muted); margin-top: .6rem; line-height: 1.55; }
+    .chart { width: 100%; height: 280px; }
+    .chart-sm { height: 220px; }
+    .chart-lg { height: 340px; }
+    table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+    th, td { text-align: left; padding: .5rem .4rem; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 500; background: var(--blue-50); }
+    tbody tr:hover { background: #f8fafc; }
+    .tag-pos { color: var(--pos); font-weight: 600; }
+    .tag-neg { color: var(--neg); font-weight: 600; }
+    .section { scroll-margin-top: 1.5rem; margin-bottom: 1.5rem; }
+    .loading { color: var(--muted); font-size: .85rem; }
+    .highlight { color: var(--blue-600); font-weight: 600; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">SLK-RoBERTa</div>
+    <div class="brand-sub">中文情感分析<br>智能分析平台</div>
+    <nav class="nav">
+      <a href="#overview" class="active">数据概览</a>
+      <a href="#inference">实时推理</a>
+      <a href="#experiments">实验分析</a>
+      <a href="#training">训练过程</a>
+      <a href="#records">推理记录</a>
+    </nav>
+    <div class="access-tip">
+      <strong>外网访问（AutoDL）</strong>
+      控制台 → 自定义服务 → 添加端口 <code id="portHint">8080</code><br>
+      复制生成的链接发给他人即可访问。
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1>情感分析智能 Dashboard</h1>
+        <p>ChnSentiCorp · SLK-RoBERTa · 实时推理 + 实验可视化</p>
+      </div>
+      <div class="badge-row">
+        <span class="badge live" id="statusBadge">● 模型加载中</span>
+        <span class="badge" id="modelBadge">--</span>
+        <span class="badge" id="dataBadge">--</span>
+      </div>
+    </div>
+
+    <section id="overview" class="section">
+      <div class="grid kpi-grid">
+        <div class="card"><div class="kpi-value" id="kpiF1">--</div><div class="kpi-label">Test F1</div><div class="kpi-delta" id="kpiLift"></div></div>
+        <div class="card"><div class="kpi-value" id="kpiAcc">--</div><div class="kpi-label">Accuracy</div></div>
+        <div class="card"><div class="kpi-value" id="kpiPrec">--</div><div class="kpi-label">Precision</div></div>
+        <div class="card"><div class="kpi-value" id="kpiRec">--</div><div class="kpi-label">Recall</div></div>
+        <div class="card"><div class="kpi-value" id="kpiSamples">--</div><div class="kpi-label">数据集总量</div></div>
+        <div class="card"><div class="kpi-value" id="kpiLexicon">--</div><div class="kpi-label">Merged 词表</div></div>
+      </div>
+
+      <div class="grid cols-3" style="margin-top:1rem;">
+        <div class="card">
+          <h2>数据集划分</h2>
+          <div id="chartSplit" class="chart chart-sm"></div>
+        </div>
+        <div class="card">
+          <h2>模型能力雷达</h2>
+          <div id="chartRadar" class="chart chart-sm"></div>
+        </div>
+        <div class="card">
+          <h2>测试集混淆矩阵</h2>
+          <div id="chartConfusion" class="chart chart-sm"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:1rem;">
+        <h2>模型与数据详情</h2>
+        <div class="info-grid" id="infoGrid"></div>
+      </div>
+    </section>
+
+    <section id="inference" class="section">
+      <div class="grid cols-2">
+        <div class="card">
+          <h2>实时情感推理</h2>
+          <textarea id="inputText" placeholder="输入中文评论，停止输入 0.6 秒后自动分析..."></textarea>
+          <div class="btn-row">
+            <button class="btn-primary" id="btnPredict">立即分析</button>
+            <button class="btn-ghost" id="btnClear">清空</button>
+          </div>
+          <div class="result-box" id="resultBox"><div class="loading">等待输入...</div></div>
+        </div>
+        <div class="card">
+          <h2>本次会话分布</h2>
+          <div id="chartSession" class="chart chart-sm"></div>
+          <div id="gateChart" class="chart chart-sm" style="margin-top:.5rem;"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="experiments" class="section">
+      <div class="grid cols-2">
+        <div class="card"><h2>主结果对比（BERT / RoBERTa / SLK）</h2><div id="chartMain" class="chart"></div></div>
+        <div class="card"><h2>多指标对比</h2><div id="chartMetrics" class="chart"></div></div>
+        <div class="card"><h2>两阶段消融演进</h2><div id="chartPhaseCmp" class="chart"></div></div>
+        <div class="card"><h2>第二阶段同条件消融</h2><div id="chartPhase2" class="chart"></div></div>
+        <div class="card"><h2>第一阶段探索消融</h2><div id="chartPhase1" class="chart"></div></div>
+        <div class="card"><h2>词表优化过程</h2><div id="chartLexicon" class="chart"></div></div>
+        <div class="card"><h2>测试集置信度分布</h2><div id="chartConfDist" class="chart"></div></div>
+        <div class="card"><h2>相对 BERT 提升</h2><div id="chartLift" class="chart chart-sm"></div></div>
+      </div>
+
+      <div class="card" style="margin-top:1rem;">
+        <h2>全部实验记录（<span id="expCount">0</span> 组）</h2>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th>实验</th><th>分组</th><th>Acc</th><th>P</th><th>R</th><th>F1</th><th>说明</th></tr></thead>
+            <tbody id="expTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="training" class="section">
+      <div class="card">
+        <h2>训练曲线 · tune_lr1e5_ep5</h2>
+        <div id="chartHistory" class="chart chart-lg"></div>
+      </div>
+    </section>
+
+    <section id="records" class="section">
+      <div class="card">
+        <h2>实时推理记录</h2>
+        <table>
+          <thead><tr><th>时间</th><th>文本</th><th>情感</th><th>置信度</th><th>门控</th></tr></thead>
+          <tbody id="recentBody"><tr><td colspan="5" class="loading">暂无记录</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const BLUE = "#2563eb", BLUE_LIGHT = "#60a5fa", BLUE_DARK = "#1e3a5f";
+const charts = {};
+let debounceTimer = null, sessionData = { total: 0, positive: 0, negative: 0 };
+let lastGate = null;
+
+function chart(id) {
+  if (!charts[id]) {
+    charts[id] = echarts.init(document.getElementById(id));
+    window.addEventListener("resize", () => charts[id]?.resize());
+  }
+  return charts[id];
+}
+
+function barOpt(labels, values, color = BLUE, ymin = 93, ymax = 96) {
+  return {
+    tooltip: { trigger: "axis" },
+    grid: { left: 45, right: 15, top: 25, bottom: 55 },
+    xAxis: { type: "category", data: labels, axisLabel: { rotate: 18, fontSize: 10, color: "#64748b" } },
+    yAxis: { type: "value", min: ymin, max: ymax, axisLabel: { formatter: "{value}%", color: "#64748b" }, splitLine: { lineStyle: { type: "dashed" } } },
+    series: [{ type: "bar", data: values, barWidth: "48%", itemStyle: { color, borderRadius: [6,6,0,0] },
+      label: { show: true, position: "top", formatter: "{c}%", fontSize: 10, color: BLUE_DARK } }]
+  };
+}
+
+async function bootstrap() {
+  const [summary, chartData, health] = await Promise.all([
+    fetch("/api/analytics/summary").then(r => r.json()),
+    fetch("/api/analytics/charts").then(r => r.json()),
+    fetch("/api/health").then(r => r.json()),
+  ]);
+
+  const k = summary.kpis, m = summary.model, d = summary.dataset;
+  document.getElementById("statusBadge").textContent = `● 在线 · F1 ${k.f1}%`;
+  document.getElementById("modelBadge").textContent = `模型 ${health.model}`;
+  document.getElementById("dataBadge").textContent = `数据 ${k.total_samples} 条 · ${k.experiment_runs} 组实验`;
+  document.getElementById("kpiF1").textContent = k.f1 + "%";
+  document.getElementById("kpiAcc").textContent = k.accuracy + "%";
+  document.getElementById("kpiPrec").textContent = k.precision + "%";
+  document.getElementById("kpiRec").textContent = k.recall + "%";
+  document.getElementById("kpiSamples").textContent = k.total_samples.toLocaleString();
+  document.getElementById("kpiLexicon").textContent = k.lexicon_words.toLocaleString();
+  document.getElementById("kpiLift").textContent = m.lift_vs_bert ? `↑ ${m.lift_vs_bert}% vs BERT` : "";
+  document.getElementById("expCount").textContent = summary.experiments.length;
+
+  document.getElementById("infoGrid").innerHTML = `
+    <div class="info-item"><span>Backbone</span>${m.backbone}</div>
+    <div class="info-item"><span>Checkpoint</span>${m.checkpoint}</div>
+    <div class="info-item"><span>Train / Val / Test</span>${d.splits.train?.total||0} / ${d.splits.val?.total||0} / ${d.splits.test?.total||0}</div>
+    <div class="info-item"><span>平均文本长度</span>Train ${d.splits.train?.avg_length||0} · Test ${d.splits.test?.avg_length||0} 字</div>
+    <div class="info-item"><span>训练配置</span>lr=${m.training.lr} · ${m.training.epochs} epochs · bs=${m.training.batch_size}</div>
+    <div class="info-item"><span>测试错误数</span>${k.test_errors} / ${k.test_samples} 条</div>
+    <div class="info-item"><span>词表规模</span>正 ${d.lexicon.positive_words} + 负 ${d.lexicon.negative_words}</div>
+    <div class="info-item"><span>核心模块</span>${m.modules.join(" · ")}</div>
+  `;
+
+  chart("chartSplit").setOption({
+    tooltip: { trigger: "item" },
+    color: [BLUE, BLUE_LIGHT, "#93c5fd"],
+    series: [{ type: "pie", radius: ["40%","68%"], data: chartData.dataset_split.labels.map((l,i)=>({name:l,value:chartData.dataset_split.values[i]})),
+      label: { formatter: "{b}\n{c} ({d}%)" } }]
+  });
+
+  chart("chartRadar").setOption({
+    radar: { indicator: [{name:"Acc",max:100},{name:"Prec",max:100},{name:"Rec",max:100},{name:"F1",max:100}], radius: "62%" },
+    series: [{ type: "radar", data: [{ value: chartData.radar, name: "SLK-RoBERTa", areaStyle: { color: "rgba(37,99,235,.2)" }, lineStyle: { color: BLUE } }] }]
+  });
+
+  const cm = chartData.confusion;
+  chart("chartConfusion").setOption({
+    tooltip: { position: "top" },
+    grid: { left: 60, right: 30, top: 20, bottom: 40 },
+    xAxis: { type: "category", data: ["预测负","预测正"], axisLabel: { color: "#64748b" } },
+    yAxis: { type: "category", data: ["真实负","真实正"], axisLabel: { color: "#64748b" } },
+    visualMap: { min: 0, max: Math.max(...cm.matrix.flat()), show: false, inRange: { color: ["#eff6ff","#2563eb"] } },
+    series: [{ type: "heatmap", data: cm.matrix.flatMap((row,i)=>row.map((v,j)=>[j,i,v])), label: { show: true, fontSize: 14 } }]
+  });
+
+  chart("chartMain").setOption(barOpt(chartData.main_comparison.labels, chartData.main_comparison.f1, BLUE));
+  const metrics = chartData.main_comparison.metrics || [];
+  chart("chartMetrics").setOption({
+    tooltip: { trigger: "axis" },
+    legend: { bottom: 0, textStyle: { fontSize: 10 } },
+    grid: { left: 45, right: 15, top: 25, bottom: 45 },
+    xAxis: { type: "category", data: metrics.map(x=>x.model) },
+    yAxis: { type: "value", min: 91, max: 98, axisLabel: { formatter: "{value}%" } },
+    series: [
+      { name: "Acc", type: "bar", data: metrics.map(x=>x.accuracy), itemStyle: { color: BLUE_LIGHT } },
+      { name: "F1", type: "bar", data: metrics.map(x=>x.f1), itemStyle: { color: BLUE } },
+    ]
+  });
+
+  chart("chartPhaseCmp").setOption({
+    tooltip: { trigger: "axis" },
+    legend: { bottom: 0 },
+    grid: { left: 45, right: 15, top: 25, bottom: 50 },
+    xAxis: { type: "category", data: chartData.phase_comparison.labels, axisLabel: { rotate: 15, fontSize: 10 } },
+    yAxis: { type: "value", min: 94, max: 96, axisLabel: { formatter: "{value}%" } },
+    series: [
+      { name: "第一阶段", type: "bar", data: chartData.phase_comparison.phase1, itemStyle: { color: "#93c5fd" } },
+      { name: "第二阶段", type: "bar", data: chartData.phase_comparison.phase2, itemStyle: { color: BLUE } },
+    ]
+  });
+
+  chart("chartPhase2").setOption(barOpt(chartData.phase2_ablation.labels, chartData.phase2_ablation.f1, BLUE_DARK, 93.5, 96));
+  chart("chartPhase1").setOption(barOpt(chartData.phase1_ablation.labels, chartData.phase1_ablation.f1, "#64748b", 94, 95.5));
+  chart("chartLexicon").setOption({
+    tooltip: { trigger: "axis" },
+    grid: { left: 45, right: 15, top: 25, bottom: 65 },
+    xAxis: { type: "category", data: chartData.lexicon_evolution.labels, axisLabel: { rotate: 20, fontSize: 9 } },
+    yAxis: { type: "value", min: 94.5, max: 95.5, axisLabel: { formatter: "{value}%" } },
+    series: [{ type: "line", smooth: true, data: chartData.lexicon_evolution.f1, itemStyle: { color: BLUE },
+      areaStyle: { color: "rgba(37,99,235,.12)" }, label: { show: true, formatter: "{c}%", fontSize: 9 } }]
+  });
+
+  chart("chartConfDist").setOption({
+    tooltip: { trigger: "axis" },
+    grid: { left: 45, right: 15, top: 25, bottom: 30 },
+    xAxis: { type: "category", data: chartData.confidence_distribution.labels },
+    yAxis: { type: "value", name: "样本数" },
+    series: [{ type: "bar", data: chartData.confidence_distribution.values, itemStyle: { color: BLUE_LIGHT, borderRadius: [4,4,0,0] } }]
+  });
+
+  const slk = metrics.find(x=>x.model==="SLK-RoBERTa"), bert = metrics.find(x=>x.model==="BERT");
+  if (slk && bert) {
+    chart("chartLift").setOption({
+      series: [{ type: "gauge", min: 0, max: 2, detail: { formatter: "+{value}%", fontSize: 18, color: BLUE },
+        data: [{ value: +(slk.f1 - bert.f1).toFixed(2), name: "F1 提升" }],
+        axisLine: { lineStyle: { width: 12, color: [[1, BLUE]] } } }]
+    });
+  }
+
+  const hist = chartData.training_history || [];
+  chart("chartHistory").setOption({
+    tooltip: { trigger: "axis" },
+    legend: { data: ["Train Loss","Val Loss","Val F1"], bottom: 0 },
+    grid: { left: 50, right: 40, top: 30, bottom: 50 },
+    xAxis: { type: "category", data: hist.map(h=>"Ep"+h.epoch) },
+    yAxis: [
+      { type: "value", name: "Loss", min: 0 },
+      { type: "value", name: "F1", min: 0.85, max: 1, axisLabel: { formatter: v=>(v*100).toFixed(0)+"%" } }
+    ],
+    series: [
+      { name: "Train Loss", type: "line", smooth: true, data: hist.map(h=>+h.train_loss), itemStyle: { color: "#94a3b8" } },
+      { name: "Val Loss", type: "line", smooth: true, data: hist.map(h=>+h.val_loss), itemStyle: { color: "#64748b" } },
+      { name: "Val F1", type: "line", yAxisIndex: 1, smooth: true, data: hist.map(h=>+h.val_f1), itemStyle: { color: BLUE }, areaStyle: { color: "rgba(37,99,235,.08)" } },
+    ]
+  });
+
+  document.getElementById("expTable").innerHTML = summary.experiments.map(e => `
+    <tr>
+      <td>${e.model}</td><td>${e.group}</td>
+      <td>${e.accuracy}%</td><td>${e.precision}%</td><td>${e.recall}%</td>
+      <td class="highlight">${e.f1}%</td><td>${e.notes}</td>
+    </tr>`).join("");
+
+  sessionData = summary.session || sessionData;
+  renderSession();
+}
+
+function renderSession() {
+  chart("chartSession").setOption({
+    tooltip: { trigger: "item" },
+    color: ["#059669","#dc2626"],
+    series: [{ type: "pie", radius: ["42%","68%"],
+      data: [{name:"正面",value:sessionData.positive||0},{name:"负面",value:sessionData.negative||0}],
+      label: { formatter: "{b}: {c}" } }]
+  });
+  if (lastGate !== null) {
+    chart("gateChart").setOption({
+      series: [{ type: "gauge", min: 0, max: 1, detail: { formatter: "{value}", fontSize: 14 },
+        data: [{ value: lastGate, name: "词表门控" }], axisLine: { lineStyle: { color: [[1, BLUE]] } } }]
+    });
+  }
+}
+
+function renderResult(data) {
+  lastGate = data.semantic_gate;
+  const pos = data.label_id === 1;
+  document.getElementById("resultBox").innerHTML = `
+    <span class="result-label ${pos?"pos":"neg"}">${data.label}</span>
+    <div>置信度 <strong class="highlight">${(data.confidence*100).toFixed(2)}%</strong></div>
+    <div class="prob-row"><span>正</span><div class="bar-track"><div class="bar-fill pos" style="width:${data.positive_prob*100}%"></div></div><span>${(data.positive_prob*100).toFixed(1)}%</span></div>
+    <div class="prob-row"><span>负</span><div class="bar-track"><div class="bar-fill neg" style="width:${data.negative_prob*100}%"></div></div><span>${(data.negative_prob*100).toFixed(1)}%</span></div>
+    <div class="analysis">${data.analysis}</div>`;
+  renderSession();
+}
+
+function renderRecent(items) {
+  const body = document.getElementById("recentBody");
+  if (!items.length) { body.innerHTML = '<tr><td colspan="5" class="loading">暂无记录</td></tr>'; return; }
+  body.innerHTML = items.map(i => `
+    <tr>
+      <td>${i.timestamp}</td>
+      <td>${i.text.length>24?i.text.slice(0,24)+"…":i.text}</td>
+      <td class="${i.label_id===1?"tag-pos":"tag-neg"}">${i.label}</td>
+      <td>${(i.confidence*100).toFixed(1)}%</td>
+      <td>${i.semantic_gate??"-"}</td>
+    </tr>`).join("");
+}
+
+async function predict() {
+  const text = document.getElementById("inputText").value.trim();
+  if (!text) { document.getElementById("resultBox").innerHTML = '<div class="loading">请输入文本</div>'; return; }
+  document.getElementById("resultBox").innerHTML = '<div class="loading">SLK-RoBERTa 推理中...</div>';
+  try {
+    const res = await fetch("/api/predict", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({text}) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail||"失败");
+    renderResult(data);
+    const recent = await fetch("/api/predict/recent").then(r=>r.json());
+    sessionData = recent.session;
+    renderRecent(recent.items);
+  } catch(e) {
+    document.getElementById("resultBox").innerHTML = `<div class="loading" style="color:var(--neg)">${e.message}</div>`;
+  }
+}
+
+document.getElementById("btnPredict").onclick = predict;
+document.getElementById("btnClear").onclick = () => {
+  document.getElementById("inputText").value = "";
+  document.getElementById("resultBox").innerHTML = '<div class="loading">等待输入...</div>';
+};
+document.getElementById("inputText").oninput = () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(predict, 600); };
+
+function initScrollSpy() {
+  const sections = [...document.querySelectorAll(".section")];
+  const navLinks = [...document.querySelectorAll(".nav a")];
+
+  navLinks.forEach(link => {
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      const target = document.querySelector(link.getAttribute("href"));
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+
+  function setActive(id) {
+    navLinks.forEach(link => {
+      link.classList.toggle("active", link.getAttribute("href") === `#${id}`);
+    });
+  }
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+      if (visible.length) setActive(visible[0].target.id);
+    },
+    { root: null, rootMargin: "-20% 0px -55% 0px", threshold: [0.08, 0.2, 0.4, 0.6] }
+  );
+
+  sections.forEach((section) => observer.observe(section));
+
+  window.addEventListener("scroll", () => {
+    if (window.scrollY < 80) setActive(sections[0]?.id || "overview");
+    if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 20) {
+      setActive(sections[sections.length - 1]?.id || "records");
+    }
+  }, { passive: true });
+}
+
+initScrollSpy();
+document.getElementById("portHint").textContent = location.port || "8080";
+
+bootstrap().catch(e => { document.getElementById("statusBadge").textContent = "● 加载失败"; console.error(e); });
+</script>
+</body>
+</html>

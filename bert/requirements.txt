@@ -1,0 +1,11 @@
+# 最小依赖（只列代码里直接 import 的包）
+# pip 会自动安装 transformers 所需的 tokenizers、safetensors 等
+
+# PyTorch：AutoDL 通常已预装 GPU 版，已有则不用装
+# pip install torch --index-url https://download.pytorch.org/whl/cu121
+torch
+
+transformers
+pandas
+pyarrow
+numpy

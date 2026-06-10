@@ -1,0 +1,17 @@
+group,run_name,model,pooling,lexicon,fgm,lexicon_file,lr,epochs,accuracy,precision,recall,f1,output_dir,notes
+main,tune_lr1e5_ep5,SLK-RoBERTa 全开,yes,yes,yes,merged,1e-5,5,0.954048,0.968397,0.938731,0.953333,outputs/tune_lr1e5_ep5,最终主模型
+main,ablation_pool_only_ep5,SLK w/o 词表,yes,no,yes,,1e-5,5,0.954048,0.970522,0.936543,0.953229,outputs/ablation_pool_only_ep5,5epoch消融
+main,ablation_lexicon_only_ep5,SLK w/o 多池化,no,yes,yes,merged,1e-5,5,0.948578,0.955556,0.940919,0.948181,outputs/ablation_lexicon_only_ep5,5epoch消融
+main,ablation_no_fgm_ep5,SLK w/o FGM,yes,yes,no,merged,1e-5,5,0.943107,0.953020,0.932166,0.942478,outputs/ablation_no_fgm_ep5,5epoch消融
+main,roberta_ep5,RoBERTa 基线,no,no,no,,1e-5,5,0.942013,0.961187,0.921225,0.940782,outputs/roberta_ep5,同条件基线
+baseline,bert_test_eval,BERT 基线,no,no,no,,2e-5,3,0.943107,0.967667,0.916849,0.941573,bert/results/test_eval,独立脚本基线
+tuning,tune_r1_ep5,SLK 全开 lr=2e-5,yes,yes,yes,merged,2e-5,5,0.952954,0.968326,0.936543,0.952169,outputs/tune_r1_ep5,学习率对照
+tuning,tune_lr3e5_ep5,SLK 全开 lr=3e-5,yes,yes,yes,merged,3e-5,5,0.950766,0.968182,0.932166,0.949833,outputs/tune_lr3e5_ep5,学习率对照
+lexicon,slk_full_merged_lexicon,SLK 全开 merged 词表,yes,yes,yes,merged,2e-5,3,0.949672,0.959732,0.938731,0.949115,outputs/slk_full_merged_lexicon,词表优化
+lexicon,slk_full_focus_lexicon,SLK 全开 focus 词表,yes,yes,yes,focus,2e-5,3,0.949672,0.959732,0.938731,0.949115,outputs/slk_full_focus_lexicon,词表优化
+lexicon,slk_full_big_lexicon,SLK 全开 big 词表,yes,yes,yes,big,2e-5,3,0.948578,0.959641,0.936543,0.947951,outputs/slk_full_big_lexicon,词表优化
+lexicon,slk_roberta_fgm,SLK 全开 默认小词表,yes,yes,yes,default,2e-5,3,0.948578,0.961712,0.934354,0.947836,outputs/slk_roberta_fgm,词表优化
+ablation3ep,ablation_pool_only,SLK w/o 词表,yes,no,yes,,2e-5,3,0.952954,0.970455,0.934354,0.952062,outputs/ablation_pool_only,3epoch消融
+ablation3ep,ablation_lexicon_only,SLK w/o 多池化,no,yes,yes,default,2e-5,3,0.950766,0.966063,0.934354,0.949944,outputs/ablation_lexicon_only,3epoch消融
+ablation3ep,ablation_no_fgm,SLK w/o FGM,yes,yes,no,default,2e-5,3,0.949672,0.955654,0.943107,0.949339,outputs/ablation_no_fgm,3epoch消融
+ablation3ep,roberta_baseline,RoBERTa 基线,no,no,no,,2e-5,3,0.949672,0.965986,0.932166,0.948775,outputs/roberta_baseline,3epoch基线
