@@ -3,6 +3,7 @@ uvicorn[standard]
 pydantic
 torch
 transformers
+huggingface_hub
 pandas
 pyarrow
 numpy

@@ -1,0 +1,19 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# 部署前请在 Dashboard 设置环境变量 MODEL_URL 或 MODEL_HF_REPO（见 scripts/render_setup.py）
+services:
+  - type: web
+    name: slk-roberta-dashboard
+    runtime: python
+    plan: starter
+    buildCommand: >-
+      pip install --upgrade pip &&
+      pip install torch --index-url https://download.pytorch.org/whl/cpu &&
+      pip install -r requirements.txt &&
+      python scripts/render_setup.py
+    startCommand: uvicorn dashboard_app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: WEB_CONCURRENCY
+        value: "1"

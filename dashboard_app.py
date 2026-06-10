@@ -5,6 +5,7 @@ import json
 import os
 import socket
 import sys
+import threading
 from collections import deque
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -35,6 +36,9 @@ DATA_DIR = ROOT / "bert" / "data"
 LEXICON_META = ROOT / "data" / "lexicon" / "lexicon_meta.json"
 
 predictor: SentimentPredictor | None = None
+model_load_error: str | None = None
+model_loading = False
+_model_lock = threading.Lock()
 recent_predictions: deque[dict[str, Any]] = deque(maxlen=50)
 session_stats = {"total": 0, "positive": 0, "negative": 0}
 
@@ -47,19 +51,54 @@ def pct(value: float) -> float:
     return round(float(value) * 100, 2)
 
 
-def active_model_dir() -> Path:
+def active_model_dir() -> Path | None:
+    env_dir = os.getenv("MODEL_DIR", "").strip()
+    if env_dir:
+        path = Path(env_dir)
+        if (path / "best_model.pt").exists():
+            return path
     if (MODEL_DIR / "best_model.pt").exists():
         return MODEL_DIR
     fallback = ROOT / "models" / "slk_roberta_fgm"
     if (fallback / "best_model.pt").exists():
         return fallback
-    raise FileNotFoundError("未找到可用的模型权重 best_model.pt")
+    return None
+
+
+def _load_predictor_sync() -> None:
+    global predictor, model_load_error, model_loading
+    with _model_lock:
+        if predictor is not None or model_loading:
+            return
+        model_loading = True
+    try:
+        model_path = active_model_dir()
+        if model_path is None:
+            raise FileNotFoundError(
+                "未找到 best_model.pt。请在 Render 设置 MODEL_URL 或 MODEL_HF_REPO，"
+                "或本地将权重放到 models/tune_lr1e5_ep5/"
+            )
+        loaded = SentimentPredictor(model_dir=model_path)
+        with _model_lock:
+            predictor = loaded
+            model_load_error = None
+        print(f"Dashboard 模型已加载: {model_path}")
+    except Exception as exc:
+        with _model_lock:
+            model_load_error = str(exc)
+        print(f"模型加载失败: {exc}")
+    finally:
+        with _model_lock:
+            model_loading = False
 
 
 def load_predictor() -> SentimentPredictor:
     global predictor
     if predictor is None:
-        predictor = SentimentPredictor(model_dir=active_model_dir())
+        _load_predictor_sync()
+    if predictor is None:
+        detail = model_load_error or "模型尚未就绪，请稍后重试"
+        raise HTTPException(status_code=503, detail=detail)
     return predictor
 
 
@@ -145,6 +184,17 @@ def read_confusion() -> dict[str, Any]:
 
 def read_model_info() -> dict[str, Any]:
     model_path = active_model_dir()
+    if model_path is None:
+        return {
+            "name": "SLK-RoBERTa",
+            "checkpoint": "未部署",
+            "backbone": "chinese-roberta-wwm-ext",
+            "modules": ["多粒度池化", "情感词表门控", "FGM 对抗训练"],
+            "architecture": {},
+            "training": {},
+            "metrics": next((x for x in read_experiments() if x["run_name"] == "tune_lr1e5_ep5"), {}),
+            "lift_vs_bert": None,
+        }
     arch = {}
     arch_path = model_path / "architecture.json"
     if arch_path.exists():
@@ -176,8 +226,8 @@ def read_model_info() -> dict[str, Any]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    load_predictor()
-    print(f"Dashboard 模型已加载: {active_model_dir()}")
+    # 后台加载模型，避免阻塞端口绑定（Render 需在启动后尽快检测到 PORT）
+    threading.Thread(target=_load_predictor_sync, daemon=True).start()
     yield
 
 
@@ -204,9 +254,19 @@ def legacy_static() -> RedirectResponse:
 def health() -> dict[str, Any]:
     model_path = active_model_dir()
     main = next((x for x in read_experiments() if x["run_name"] == "tune_lr1e5_ep5"), None)
+    if predictor is not None:
+        status = "ok"
+    elif model_loading:
+        status = "loading"
+    elif model_load_error:
+        status = "error"
+    else:
+        status = "no_model"
     return {
-        "status": "ok",
-        "model": model_path.name,
+        "status": status,
+        "model": model_path.name if model_path else None,
+        "model_ready": predictor is not None,
+        "model_error": model_load_error,
         "model_f1": main["f1"] if main else 95.33,
         "experiment_count": len(read_experiments()),
         "timestamp": datetime.now().isoformat(timespec="seconds"),
@@ -385,6 +445,8 @@ def predict(req: PredictRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="请输入非空文本")
     try:
         result = load_predictor().predict(text)
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"推理失败: {exc}") from exc
 
@@ -449,13 +511,14 @@ if DASHBOARD_DIR.exists():
 if __name__ == "__main__":
     import uvicorn
 
-    port = int(os.getenv("PORT") or find_free_port())
+    port = int(os.environ["PORT"]) if os.getenv("PORT") else find_free_port()
     print(f"统一 Dashboard 启动: http://0.0.0.0:{port}")
-    print("=" * 56)
-    print("本机访问:  http://127.0.0.1:{port}".format(port=port))
-    print("外网分享（AutoDL）:")
-    print(f"  1. 打开 AutoDL 控制台 → 自定义服务")
-    print(f"  2. 添加端口 {port}，协议选 http")
-    print(f"  3. 复制生成的「公网链接」发给他人即可访问")
-    print("=" * 56)
+    if not os.getenv("PORT"):
+        print("=" * 56)
+        print("本机访问:  http://127.0.0.1:{port}".format(port=port))
+        print("外网分享（AutoDL）:")
+        print(f"  1. 打开 AutoDL 控制台 → 自定义服务")
+        print(f"  2. 添加端口 {port}，协议选 http")
+        print(f"  3. 复制生成的「公网链接」发给他人即可访问")
+        print("=" * 56)
     uvicorn.run(app, host="0.0.0.0", port=port)
