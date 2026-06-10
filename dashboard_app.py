@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import socket
 import sys
 from collections import deque
@@ -448,7 +449,7 @@ if DASHBOARD_DIR.exists():
 if __name__ == "__main__":
     import uvicorn
 
-    port = find_free_port()
+    port = int(os.getenv("PORT") or find_free_port())
     print(f"统一 Dashboard 启动: http://0.0.0.0:{port}")
     print("=" * 56)
     print("本机访问:  http://127.0.0.1:{port}".format(port=port))
